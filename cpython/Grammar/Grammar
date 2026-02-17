@@ -23,10 +23,13 @@ decorator: '@' dotted_name [ '(' [arglist] ')' ] NEWLINE
 decorators: decorator+
 decorated: decorators (classdef | funcdef)
 funcdef: 'def' NAME parameters ['->' test] ':' suite
-parameters: '(' [varargslist] ')'
-varargslist: ((fpdef [':' test] ['=' test] ',')*
+parameters: '(' [typedargslist] ')'
+typedargslist: ((fpdef [':' test] ['=' test] ',')*
               ('*' NAME [':' test] [',' '**' NAME [':' test]] | '**' NAME [':' test]) |
               fpdef [':' test] ['=' test] (',' fpdef [':' test] ['=' test])* [','])
+varargslist: ((fpdef ['=' test] ',')*
+              ('*' NAME [',' '**' NAME] | '**' NAME) |
+              fpdef ['=' test] (',' fpdef ['=' test])* [','])
 fpdef: NAME | '(' fplist ')'
 fplist: fpdef (',' fpdef)* [',']
 

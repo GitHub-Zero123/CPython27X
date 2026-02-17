@@ -985,6 +985,7 @@ VALIDATER(node);                VALIDATER(small_stmt);
 VALIDATER(class);               VALIDATER(node);
 VALIDATER(parameters);          VALIDATER(suite);
 VALIDATER(testlist);            VALIDATER(varargslist);
+VALIDATER(typedargslist);
 VALIDATER(fpdef);               VALIDATER(fplist);
 VALIDATER(stmt);                VALIDATER(simple_stmt);
 VALIDATER(expr_stmt);           VALIDATER(power);
@@ -1176,6 +1177,13 @@ validate_if(node *tree)
  *
  */
 static int
+validate_typedargslist(node *tree)
+{
+    return validate_varargslist(tree);
+}
+
+
+static int
 validate_parameters(node *tree)
 {
     int nch = NCH(tree);
@@ -1185,7 +1193,7 @@ validate_parameters(node *tree)
         res = (validate_lparen(CHILD(tree, 0))
                && validate_rparen(CHILD(tree, nch - 1)));
         if (res && (nch == 3))
-            res = validate_varargslist(CHILD(tree, 1));
+            res = validate_typedargslist(CHILD(tree, 1));
     }
     else {
         (void) validate_numnodes(tree, 2, "parameters");
@@ -1304,7 +1312,7 @@ static int
 validate_varargslist(node *tree)
 {
     int nch = NCH(tree);
-    int res = validate_ntype(tree, varargslist) && (nch != 0);
+    int res = (validate_ntype(tree, varargslist) || validate_ntype(tree, typedargslist)) && (nch != 0);
     int sym;
 
     if (!res)

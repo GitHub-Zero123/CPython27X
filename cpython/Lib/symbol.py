@@ -19,6 +19,7 @@ decorated = 261
 funcdef = 262
 parameters = 263
 varargslist = 264
+typedargslist = 341
 fpdef = 265
 fplist = 266
 stmt = 267

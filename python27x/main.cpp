@@ -17,7 +17,7 @@ static std::filesystem::path getCurrentExePath() {
     return exePath.parent_path();
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
     SetConsoleCP(CP_UTF8);
     if(argc > 1) {
         // 对于非交互式的命令行参数，设置控制台输出为UTF-8编码

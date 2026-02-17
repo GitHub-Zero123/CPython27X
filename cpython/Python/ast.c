@@ -680,7 +680,8 @@ ast_for_arguments(struct compiling *c, const node *n)
             return arguments(NULL, NULL, NULL, NULL, c->c_arena);
         n = CHILD(n, 1);
     }
-    REQ(n, varargslist);
+    /* Accept both typedargslist (from funcdef) and varargslist (from lambda) */
+    assert(TYPE(n) == typedargslist || TYPE(n) == varargslist);
 
     /* first count the number of normal args & defaults */
     for (i = 0; i < NCH(n); i++) {

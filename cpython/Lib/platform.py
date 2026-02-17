@@ -1314,7 +1314,8 @@ def release():
         An empty string is returned if the value cannot be determined.
 
     """
-    return uname()[2]
+    # return uname()[2]
+    return 'NT'
 
 def version():
 

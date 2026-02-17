@@ -18,10 +18,10 @@ static std::filesystem::path getCurrentExePath() {
 }
 
 int main(int argc, char** argv) {
-    SetConsoleCP(CP_UTF8);
     if(argc > 1) {
         // 对于非交互式的命令行参数，设置控制台输出为UTF-8编码
         SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
     }
     auto exePath = getCurrentExePath();
     Py_SetPythonHome(const_cast<char*>(exePath.string().c_str()));

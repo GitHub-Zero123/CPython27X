@@ -22,11 +22,11 @@ eval_input: testlist NEWLINE* ENDMARKER
 decorator: '@' dotted_name [ '(' [arglist] ')' ] NEWLINE
 decorators: decorator+
 decorated: decorators (classdef | funcdef)
-funcdef: 'def' NAME parameters ':' suite
+funcdef: 'def' NAME parameters ['->' test] ':' suite
 parameters: '(' [varargslist] ')'
-varargslist: ((fpdef ['=' test] ',')*
-              ('*' NAME [',' '**' NAME] | '**' NAME) |
-              fpdef ['=' test] (',' fpdef ['=' test])* [','])
+varargslist: ((fpdef [':' test] ['=' test] ',')*
+              ('*' NAME [':' test] [',' '**' NAME [':' test]] | '**' NAME [':' test]) |
+              fpdef [':' test] ['=' test] (',' fpdef [':' test] ['=' test])* [','])
 fpdef: NAME | '(' fplist ')'
 fplist: fpdef (',' fpdef)* [',']
 
@@ -34,7 +34,8 @@ stmt: simple_stmt | compound_stmt
 simple_stmt: small_stmt (';' small_stmt)* [';'] NEWLINE
 small_stmt: (expr_stmt | print_stmt  | del_stmt | pass_stmt | flow_stmt |
              import_stmt | global_stmt | exec_stmt | assert_stmt)
-expr_stmt: testlist (augassign (yield_expr|testlist) |
+expr_stmt: testlist (':' test ['=' (yield_expr|testlist)] |
+                     augassign (yield_expr|testlist) |
                      ('=' (yield_expr|testlist))*)
 augassign: ('+=' | '-=' | '*=' | '/=' | '%=' | '&=' | '|=' | '^=' |
             '<<=' | '>>=' | '**=' | '//=')

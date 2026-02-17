@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <string>
 #include <cstring>
-
+// 最初基于字符串替换的方案, 此处内容已过时
 extern "C" {
     #include "PythonX.h"
 }

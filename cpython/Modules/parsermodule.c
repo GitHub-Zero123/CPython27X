@@ -1680,7 +1680,17 @@ validate_expr_stmt(node *tree)
                && is_odd(nch)
                && validate_testlist(CHILD(tree, 0)));
 
-    if (res && nch == 3
+    if (res && nch >= 3
+        && TYPE(CHILD(tree, 1)) == COLON) {
+        /* Variable annotation: testlist ':' test ['=' (yield_expr|testlist)]
+           Annotation is parsed but discarded at AST level. */
+        res = validate_test(CHILD(tree, 2));
+        if (res && nch == 5) {
+            res = validate_equal(CHILD(tree, 3))
+                  && validate_yield_or_testlist(CHILD(tree, 4));
+        }
+    }
+    else if (res && nch == 3
         && TYPE(CHILD(tree, 1)) == augassign) {
         res = validate_numnodes(CHILD(tree, 1), 1, "augassign")
                 && validate_yield_or_testlist(CHILD(tree, 2));

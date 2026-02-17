@@ -663,8 +663,12 @@ static arguments_ty
 ast_for_arguments(struct compiling *c, const node *n)
 {
     /* parameters: '(' [varargslist] ')'
-       varargslist: (fpdef ['=' test] ',')* ('*' NAME [',' '**' NAME]
-            | '**' NAME) | fpdef ['=' test] (',' fpdef ['=' test])* [',']
+       varargslist: (fpdef [':' test] ['=' test] ',')*
+            ('*' NAME [':' test] [',' '**' NAME [':' test]]
+            | '**' NAME [':' test])
+            | fpdef [':' test] ['=' test]
+              (',' fpdef [':' test] ['=' test])* [',']
+       Type annotations are parsed but discarded (Py3 compatibility).
     */
     int i, j, k, n_args = 0, n_defaults = 0, found_default = 0;
     asdl_seq *args, *defaults;
@@ -705,6 +709,10 @@ ast_for_arguments(struct compiling *c, const node *n)
             case fpdef: {
                 int complex_args = 0, parenthesized = 0;
             handle_fpdef:
+                /* Skip type annotation if present: ':' test */
+                if (i + 1 < NCH(n) && TYPE(CHILD(n, i + 1)) == COLON) {
+                    i += 2; /* skip ':' and annotation type expression */
+                }
                 /* XXX Need to worry about checking if TYPE(CHILD(n, i+1)) is
                    anything other than EQUAL or a comma? */
                 /* XXX Should NCH(n) check be made a separate check? */
@@ -779,7 +787,15 @@ ast_for_arguments(struct compiling *c, const node *n)
                 vararg = NEW_IDENTIFIER(CHILD(n, i+1));
                 if (!vararg)
                     return NULL;
-                i += 3;
+                i += 2; /* skip '*' and NAME */
+                /* Skip type annotation if present: ':' test */
+                if (i < NCH(n) && TYPE(CHILD(n, i)) == COLON) {
+                    i += 2;
+                }
+                /* Skip comma if present */
+                if (i < NCH(n) && TYPE(CHILD(n, i)) == COMMA) {
+                    i += 1;
+                }
                 break;
             case DOUBLESTAR:
                 if (!forbidden_check(c, CHILD(n, i+1), STR(CHILD(n, i+1))))
@@ -787,7 +803,11 @@ ast_for_arguments(struct compiling *c, const node *n)
                 kwarg = NEW_IDENTIFIER(CHILD(n, i+1));
                 if (!kwarg)
                     return NULL;
-                i += 3;
+                i += 2; /* skip '**' and NAME */
+                /* Skip type annotation if present: ':' test */
+                if (i < NCH(n) && TYPE(CHILD(n, i)) == COLON) {
+                    i += 2;
+                }
                 break;
             default:
                 PyErr_Format(PyExc_SystemError,
@@ -893,7 +913,9 @@ ast_for_decorators(struct compiling *c, const node *n)
 static stmt_ty
 ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
 {
-    /* funcdef: 'def' NAME parameters ':' suite */
+    /* funcdef: 'def' NAME parameters ['->' test] ':' suite
+       Return type annotation ('->' test) is parsed but discarded.
+    */
     identifier name;
     arguments_ty args;
     asdl_seq *body;
@@ -909,7 +931,8 @@ ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
     args = ast_for_arguments(c, CHILD(n, name_i + 1));
     if (!args)
         return NULL;
-    body = ast_for_suite(c, CHILD(n, name_i + 3));
+    /* suite is always the last child, regardless of '->' annotation */
+    body = ast_for_suite(c, RCHILD(n, -1));
     if (!body)
         return NULL;
 
@@ -2175,12 +2198,17 @@ static stmt_ty
 ast_for_expr_stmt(struct compiling *c, const node *n)
 {
     REQ(n, expr_stmt);
-    /* expr_stmt: testlist (augassign (yield_expr|testlist)
+    /* expr_stmt: testlist (':' test ['=' (yield_expr|testlist)]
+                | augassign (yield_expr|testlist)
                 | ('=' (yield_expr|testlist))*)
        testlist: test (',' test)* [',']
        augassign: '+=' | '-=' | '*=' | '/=' | '%=' | '&=' | '|=' | '^='
                 | '<<=' | '>>=' | '**=' | '//='
        test: ... here starts the operator precedence dance
+
+       Variable annotations (': test [= ...]') are parsed but discarded:
+         'a: int'       -> treated as pass (no bytecode)
+         'a: int = 5'   -> treated as 'a = 5' (annotation discarded)
      */
 
     if (NCH(n) == 1) {
@@ -2189,6 +2217,40 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
             return NULL;
 
         return Expr(e, LINENO(n), n->n_col_offset, c->c_arena);
+    }
+    else if (TYPE(CHILD(n, 1)) == COLON) {
+        /* Variable annotation: testlist ':' test ['=' (yield_expr|testlist)]
+           Discard the annotation; optionally keep the assignment. */
+        if (NCH(n) >= 5 && TYPE(CHILD(n, 3)) == EQUAL) {
+            /* a: int = value  ->  a = value */
+            asdl_seq *targets;
+            expr_ty target, expression;
+            node *value;
+
+            targets = asdl_seq_new(1, c->c_arena);
+            if (!targets)
+                return NULL;
+            target = ast_for_testlist(c, CHILD(n, 0));
+            if (!target)
+                return NULL;
+            if (!set_context(c, target, Store, CHILD(n, 0)))
+                return NULL;
+            asdl_seq_SET(targets, 0, target);
+
+            value = CHILD(n, 4);
+            if (TYPE(value) == testlist)
+                expression = ast_for_testlist(c, value);
+            else
+                expression = ast_for_expr(c, value);
+            if (!expression)
+                return NULL;
+            return Assign(targets, expression, LINENO(n), n->n_col_offset,
+                          c->c_arena);
+        }
+        else {
+            /* a: int  ->  no-op (pass) */
+            return Pass(LINENO(n), n->n_col_offset, c->c_arena);
+        }
     }
     else if (TYPE(CHILD(n, 1)) == augassign) {
         expr_ty expr1, expr2;

@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
         SetConsoleOutputCP(CP_UTF8);
         SetConsoleCP(CP_UTF8);
     }
-    auto exePath = getCurrentExePath();
-    Py_SetPythonHome(const_cast<char*>(exePath.string().c_str()));
+    auto exePath = getCurrentExePath().string();
+    Py_SetPythonHome(const_cast<char*>(exePath.c_str()));
     return Py_Main(argc, argv);
 }

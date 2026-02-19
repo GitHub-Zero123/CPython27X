@@ -7,6 +7,9 @@ if [ -f Makefile ]; then
     make distclean
 fi
 
+export CFLAGS="-O3 -DNDEBUG -fno-profile-arcs -fno-test-coverage"
+export LDFLAGS="-O3 -DNDEBUG"
+
 # Configuration for Release build
 # --enable-optimizations: Enable expensive optimizations (PGO)
 # --with-lto: Enable Link Time Optimization

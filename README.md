@@ -10,6 +10,8 @@ CPython27X 在 Python 2.7 的基础上额外引入了 Python 3 的类型注解�
 
 ## 基础示例
 
+通过以下示例展示了 CPython27X 中类型注解的支持情况：
+
 ```python
 # -*- coding: utf-8 -*-
 
@@ -94,4 +96,14 @@ dis.dis(testFunc2)
               6 BINARY_ADD
               7 RETURN_VALUE        
 ```
-其字节码完全相同，不会导致更换解释器后出现的兼容问题。
+其字节码完全相同，不会因为引入类型注解而产生兼容问题。
+
+## 核心变动
+
+主要涉及以下核心文件的修改：
+
+- `token.h`
+- `parsermodule.c`
+- `tokenizer.c`
+- `ast.c`
+- `graminit.c`

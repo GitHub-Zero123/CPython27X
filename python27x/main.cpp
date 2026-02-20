@@ -14,6 +14,7 @@ static std::filesystem::path getCurrentExePath() {
     std::filesystem::path exePath(buf);
     return exePath.parent_path();
 }
+
 #else
 #include <unistd.h>
 
@@ -31,7 +32,7 @@ static std::filesystem::path getCurrentExePath() {
 
 int main(int argc, char** argv) {
 #ifdef _WIN32
-    if(argc > 1) {
+    if (argc > 1) {
         // 对于非交互式的命令行参数，设置控制台输出为UTF-8编码
         // 确保不再像CPython2原版那样使用系统默认编码（如GBK），以避免输出乱码问题
         SetConsoleOutputCP(CP_UTF8);

@@ -1399,6 +1399,92 @@ compiler_function(struct compiler *c, stmt_ty s)
         ADDOP_I(c, CALL_FUNCTION, 1);
     }
 
+    /* Generate __annotations__ dict if any type annotations exist.
+       After make_closure + decorators, the function object is on TOS.
+       We generate bytecode equivalent to:
+         func.__annotations__ = {'param': type, ..., 'return': ret_type}
+       This uses only existing opcodes and survives .pyc serialization. */
+    {
+        int n_annotations = 0;
+        expr_ty returns_ann = s->v.FunctionDef.returns;
+
+        /* Count non-NULL annotations */
+        if (args->annotations) {
+            for (i = 0; i < asdl_seq_LEN(args->annotations); i++) {
+                if (asdl_seq_GET(args->annotations, i))
+                    n_annotations++;
+            }
+        }
+        if (args->vararg_annotation) n_annotations++;
+        if (args->kwarg_annotation) n_annotations++;
+        if (returns_ann) n_annotations++;
+
+        if (n_annotations > 0) {
+            PyObject *ann_str;
+
+            /* DUP the function object so we still have it after STORE_ATTR */
+            ADDOP(c, DUP_TOP);
+
+            /* Build annotation dict */
+            ADDOP_I(c, BUILD_MAP, n_annotations);
+
+            /* Add parameter annotations */
+            if (args->annotations && args->args) {
+                for (i = 0; i < asdl_seq_LEN(args->annotations); i++) {
+                    expr_ty ann = (expr_ty)asdl_seq_GET(args->annotations, i);
+                    expr_ty arg;
+                    if (!ann) continue;
+
+                    arg = (expr_ty)asdl_seq_GET(args->args, i);
+                    assert(arg->kind == Name_kind);
+
+                    /* Load the type value (e.g. LOAD_NAME int) */
+                    VISIT(c, expr, ann);
+                    /* Load the param name as a string constant */
+                    ADDOP_O(c, LOAD_CONST, arg->v.Name.id, consts);
+                    /* Store into dict: dict[param_name] = type */
+                    ADDOP(c, STORE_MAP);
+                }
+            }
+
+            /* Add *args annotation */
+            if (args->vararg_annotation && args->vararg) {
+                VISIT(c, expr, args->vararg_annotation);
+                ADDOP_O(c, LOAD_CONST, args->vararg, consts);
+                ADDOP(c, STORE_MAP);
+            }
+
+            /* Add **kwargs annotation */
+            if (args->kwarg_annotation && args->kwarg) {
+                VISIT(c, expr, args->kwarg_annotation);
+                ADDOP_O(c, LOAD_CONST, args->kwarg, consts);
+                ADDOP(c, STORE_MAP);
+            }
+
+            /* Add return annotation */
+            if (returns_ann) {
+                PyObject *return_str = PyString_InternFromString("return");
+                if (!return_str)
+                    return 0;
+                VISIT(c, expr, returns_ann);
+                ADDOP_O(c, LOAD_CONST, return_str, consts);
+                ADDOP(c, STORE_MAP);
+                Py_DECREF(return_str);
+            }
+
+            /* Stack is now [func, annotations_dict].
+               We need func on TOS and dict below for STORE_ATTR:
+               STORE_ATTR does: TOS.attr = TOS1 (pops both) */
+            ADDOP(c, ROT_TWO);
+
+            ann_str = PyString_InternFromString("__annotations__");
+            if (!ann_str)
+                return 0;
+            ADDOP_NAME(c, STORE_ATTR, ann_str, names);
+            Py_DECREF(ann_str);
+        }
+    }
+
     return compiler_nameop(c, s->v.FunctionDef.name, Store);
 }
 

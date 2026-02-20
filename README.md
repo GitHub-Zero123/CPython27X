@@ -107,3 +107,6 @@ dis.dis(testFunc2)
 - `tokenizer.c`
 - `ast.c`
 - `graminit.c`
+- `compile.c`
+- `Python-ast.c`
+- `symtable.c`

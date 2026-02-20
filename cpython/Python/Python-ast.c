@@ -1060,6 +1060,7 @@ FunctionDef(identifier name, arguments_ty args, asdl_seq * body, asdl_seq *
         p->v.FunctionDef.args = args;
         p->v.FunctionDef.body = body;
         p->v.FunctionDef.decorator_list = decorator_list;
+        p->v.FunctionDef.returns = NULL;
         p->lineno = lineno;
         p->col_offset = col_offset;
         return p;
@@ -2087,6 +2088,9 @@ arguments(asdl_seq * args, identifier vararg, identifier kwarg, asdl_seq *
         p->vararg = vararg;
         p->kwarg = kwarg;
         p->defaults = defaults;
+        p->annotations = NULL;
+        p->vararg_annotation = NULL;
+        p->kwarg_annotation = NULL;
         return p;
 }
 
@@ -2219,6 +2223,11 @@ ast2obj_stmt(void* _o)
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "decorator_list", value) ==
                     -1)
+                        goto failed;
+                Py_DECREF(value);
+                value = ast2obj_expr(o->v.FunctionDef.returns);
+                if (!value) goto failed;
+                if (PyObject_SetAttrString(result, "returns", value) == -1)
                         goto failed;
                 Py_DECREF(value);
                 break;
@@ -3248,6 +3257,21 @@ ast2obj_arguments(void* _o)
         value = ast2obj_list(o->defaults, ast2obj_expr);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "defaults", value) == -1)
+                goto failed;
+        Py_DECREF(value);
+        value = ast2obj_list(o->annotations, ast2obj_expr);
+        if (!value) goto failed;
+        if (PyObject_SetAttrString(result, "annotations", value) == -1)
+                goto failed;
+        Py_DECREF(value);
+        value = ast2obj_expr(o->vararg_annotation);
+        if (!value) goto failed;
+        if (PyObject_SetAttrString(result, "vararg_annotation", value) == -1)
+                goto failed;
+        Py_DECREF(value);
+        value = ast2obj_expr(o->kwarg_annotation);
+        if (!value) goto failed;
+        if (PyObject_SetAttrString(result, "kwarg_annotation", value) == -1)
                 goto failed;
         Py_DECREF(value);
         return result;

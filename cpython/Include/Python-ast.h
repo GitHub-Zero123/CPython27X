@@ -74,6 +74,7 @@ struct _stmt {
                         arguments_ty args;
                         asdl_seq *body;
                         asdl_seq *decorator_list;
+                        expr_ty returns;  /* return type annotation */
                 } FunctionDef;
                 
                 struct {
@@ -359,6 +360,9 @@ struct _arguments {
         identifier vararg;
         identifier kwarg;
         asdl_seq *defaults;
+        asdl_seq *annotations;      /* type annotations parallel to args (expr_ty or NULL) */
+        expr_ty vararg_annotation;  /* *args type annotation */
+        expr_ty kwarg_annotation;   /* **kwargs type annotation */
 };
 
 struct _keyword {

@@ -388,7 +388,7 @@ static std::string stripTypeAnnotations(const char* code, size_t len) {
 }
 
 // 格式化源码并返回堆上的字符串地址
-// 1. 剔除 Python 3 类型注解 (参数/返回值/变量注解)
+// 1. 类型注解现在由语法和编译器原生支持, 不再需要源码级剥离
 // 2. 若启用 _FORCE_ENABLE_UTF8_SUPPORT, 自动添加 UTF-8 编码声明
 static std::string* formatStringToHeapCString(const char* format) {
     if (format == nullptr) return nullptr;
@@ -396,8 +396,8 @@ static std::string* formatStringToHeapCString(const char* format) {
     size_t len = std::strlen(format);
     if (len == 0) return new std::string();
 
-    // 剔除 Python 3 类型注解
-    std::string* result = new std::string(stripTypeAnnotations(format, len));
+    // 类型注解已由 Grammar/ast.c/compile.c 原生处理, 直接复制源码
+    std::string* result = new std::string(format, len);
 
     // 按需添加 UTF-8 编码声明
     if (_FORCE_ENABLE_UTF8_SUPPORT) {

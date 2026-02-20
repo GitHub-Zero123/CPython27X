@@ -1016,6 +1016,29 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
             VISIT_SEQ(st, expr, s->v.FunctionDef.args->defaults);
         if (s->v.FunctionDef.decorator_list)
             VISIT_SEQ(st, expr, s->v.FunctionDef.decorator_list);
+        /* Visit type annotations in the enclosing scope (before entering
+           the function block) so annotation type names are properly resolved */
+        if (s->v.FunctionDef.args->annotations) {
+            int _ann_i;
+            asdl_seq *_anns = s->v.FunctionDef.args->annotations;
+            for (_ann_i = 0; _ann_i < asdl_seq_LEN(_anns); _ann_i++) {
+                expr_ty _ann = (expr_ty)asdl_seq_GET(_anns, _ann_i);
+                if (_ann && !symtable_visit_expr(st, _ann))
+                    return 0;
+            }
+        }
+        if (s->v.FunctionDef.args->vararg_annotation) {
+            if (!symtable_visit_expr(st, s->v.FunctionDef.args->vararg_annotation))
+                return 0;
+        }
+        if (s->v.FunctionDef.args->kwarg_annotation) {
+            if (!symtable_visit_expr(st, s->v.FunctionDef.args->kwarg_annotation))
+                return 0;
+        }
+        if (s->v.FunctionDef.returns) {
+            if (!symtable_visit_expr(st, s->v.FunctionDef.returns))
+                return 0;
+        }
         if (!symtable_enter_block(st, s->v.FunctionDef.name,
                                   FunctionBlock, (void *)s, s->lineno))
             return 0;

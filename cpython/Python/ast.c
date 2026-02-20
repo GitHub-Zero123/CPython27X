@@ -659,6 +659,26 @@ set_name:
 
 /* Create AST for argument list. */
 
+/* Helper: try to parse annotation as expr_ty from a 'test' parse node.
+   Only captures simple Name expressions (basic types like int, str, etc.)
+   and dotted names (e.g. typing.List). Returns NULL for unsupported forms. */
+static expr_ty
+ast_for_annotation(struct compiling *c, const node *n)
+{
+    expr_ty ann = ast_for_expr(c, n);
+    if (!ann) {
+        /* Clear error - unsupported annotation forms are silently ignored */
+        PyErr_Clear();
+        return NULL;
+    }
+    /* Only keep Name (e.g. int) and Attribute (e.g. mod.Type) annotations */
+    if (ann->kind == Name_kind || ann->kind == Attribute_kind) {
+        return ann;
+    }
+    /* Unsupported annotation form (generics, unions, etc.) - discard */
+    return NULL;
+}
+
 static arguments_ty
 ast_for_arguments(struct compiling *c, const node *n)
 {
@@ -668,12 +688,15 @@ ast_for_arguments(struct compiling *c, const node *n)
             | '**' NAME [':' test])
             | fpdef [':' test] ['=' test]
               (',' fpdef [':' test] ['=' test])* [',']
-       Type annotations are parsed but discarded (Py3 compatibility).
+       Type annotations are captured for basic types (Py3 compatibility).
     */
     int i, j, k, n_args = 0, n_defaults = 0, found_default = 0;
-    asdl_seq *args, *defaults;
+    int has_annotations = 0;
+    asdl_seq *args, *defaults, *annotations = NULL;
     identifier vararg = NULL, kwarg = NULL;
+    expr_ty vararg_annotation = NULL, kwarg_annotation = NULL;
     node *ch;
+    arguments_ty result;
 
     if (TYPE(n) == parameters) {
         if (NCH(n) == 2) /* () as argument list */
@@ -698,6 +721,16 @@ ast_for_arguments(struct compiling *c, const node *n)
     if (!defaults && n_defaults)
         return NULL;
 
+    /* Allocate annotations array (parallel to args) for typedargslist */
+    if (TYPE(n) == typedargslist && n_args > 0) {
+        annotations = asdl_seq_new(n_args, c->c_arena);
+        if (!annotations)
+            return NULL;
+        /* Initialize all to NULL */
+        for (i = 0; i < n_args; i++)
+            asdl_seq_SET(annotations, i, NULL);
+    }
+
     /* fpdef: NAME | '(' fplist ')'
        fplist: fpdef (',' fpdef)* [',']
     */
@@ -709,9 +742,15 @@ ast_for_arguments(struct compiling *c, const node *n)
         switch (TYPE(ch)) {
             case fpdef: {
                 int complex_args = 0, parenthesized = 0;
+                expr_ty current_annotation = NULL;
             handle_fpdef:
-                /* Skip type annotation if present: ':' test */
+                /* Capture type annotation if present: ':' test */
                 if (i + 1 < NCH(n) && TYPE(CHILD(n, i + 1)) == COLON) {
+                    if (TYPE(n) == typedargslist) {
+                        current_annotation = ast_for_annotation(c, CHILD(n, i + 2));
+                        if (current_annotation)
+                            has_annotations = 1;
+                    }
                     i += 2; /* skip ':' and annotation type expression */
                 }
                 /* XXX Need to worry about checking if TYPE(CHILD(n, i+1)) is
@@ -771,8 +810,11 @@ ast_for_arguments(struct compiling *c, const node *n)
                                 c->c_arena);
                     if (!name)
                         return NULL;
-                    asdl_seq_SET(args, k++, name);
-
+                    asdl_seq_SET(args, k, name);
+                    /* Store annotation for this arg */
+                    if (annotations)
+                        asdl_seq_SET(annotations, k, current_annotation);
+                    k++;
                 }
                 i += 2; /* the name and the comma */
                 if (parenthesized && Py_Py3kWarningFlag &&
@@ -789,8 +831,13 @@ ast_for_arguments(struct compiling *c, const node *n)
                 if (!vararg)
                     return NULL;
                 i += 2; /* skip '*' and NAME */
-                /* Skip type annotation if present: ':' test */
+                /* Capture type annotation if present: ':' test */
                 if (i < NCH(n) && TYPE(CHILD(n, i)) == COLON) {
+                    if (TYPE(n) == typedargslist) {
+                        vararg_annotation = ast_for_annotation(c, CHILD(n, i + 1));
+                        if (vararg_annotation)
+                            has_annotations = 1;
+                    }
                     i += 2;
                 }
                 /* Skip comma if present */
@@ -805,8 +852,13 @@ ast_for_arguments(struct compiling *c, const node *n)
                 if (!kwarg)
                     return NULL;
                 i += 2; /* skip '**' and NAME */
-                /* Skip type annotation if present: ':' test */
+                /* Capture type annotation if present: ':' test */
                 if (i < NCH(n) && TYPE(CHILD(n, i)) == COLON) {
+                    if (TYPE(n) == typedargslist) {
+                        kwarg_annotation = ast_for_annotation(c, CHILD(n, i + 1));
+                        if (kwarg_annotation)
+                            has_annotations = 1;
+                    }
                     i += 2;
                 }
                 break;
@@ -818,7 +870,18 @@ ast_for_arguments(struct compiling *c, const node *n)
         }
     }
 
-    return arguments(args, vararg, kwarg, defaults, c->c_arena);
+    result = arguments(args, vararg, kwarg, defaults, c->c_arena);
+    if (!result)
+        return NULL;
+
+    /* Set annotation fields if any annotations were found */
+    if (has_annotations) {
+        result->annotations = annotations;
+        result->vararg_annotation = vararg_annotation;
+        result->kwarg_annotation = kwarg_annotation;
+    }
+
+    return result;
 }
 
 static expr_ty
@@ -915,11 +978,12 @@ static stmt_ty
 ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
 {
     /* funcdef: 'def' NAME parameters ['->' test] ':' suite
-       Return type annotation ('->' test) is parsed but discarded.
+       Return type annotation ('->' test) is captured for basic types.
     */
     identifier name;
     arguments_ty args;
     asdl_seq *body;
+    stmt_ty result;
     int name_i = 1;
 
     REQ(n, funcdef);
@@ -937,8 +1001,21 @@ ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
     if (!body)
         return NULL;
 
-    return FunctionDef(name, args, body, decorator_seq, LINENO(n),
+    result = FunctionDef(name, args, body, decorator_seq, LINENO(n),
                        n->n_col_offset, c->c_arena);
+    if (!result)
+        return NULL;
+
+    /* Capture return type annotation if present:
+       funcdef without annotation: 'def' NAME parameters ':' suite (NCH=5)
+       funcdef with annotation:    'def' NAME parameters '->' test ':' suite (NCH=7)
+    */
+    if (NCH(n) == 7 && TYPE(CHILD(n, name_i + 2)) == RARROW) {
+        /* CHILD(n, name_i + 3) is the return type 'test' node */
+        result->v.FunctionDef.returns = ast_for_annotation(c, CHILD(n, name_i + 3));
+    }
+
+    return result;
 }
 
 static stmt_ty

@@ -1395,12 +1395,10 @@ compiler_function(struct compiler *c, stmt_ty s)
     compiler_make_closure(c, co, asdl_seq_LEN(args->defaults));
     Py_DECREF(co);
 
-    for (i = 0; i < asdl_seq_LEN(decos); i++) {
-        ADDOP_I(c, CALL_FUNCTION, 1);
-    }
-
     /* Generate __annotations__ dict if any type annotations exist.
-       After make_closure + decorators, the function object is on TOS.
+       Set annotations on the raw function object BEFORE applying decorators,
+       because decorators like @classmethod/@staticmethod produce wrapper
+       objects that don't have a __annotations__ attribute.
        We generate bytecode equivalent to:
          func.__annotations__ = {'param': type, ..., 'return': ret_type}
        This uses only existing opcodes and survives .pyc serialization. */
@@ -1483,6 +1481,12 @@ compiler_function(struct compiler *c, stmt_ty s)
             ADDOP_NAME(c, STORE_ATTR, ann_str, names);
             Py_DECREF(ann_str);
         }
+    }
+
+    /* Apply decorators AFTER setting __annotations__ on the raw function,
+       so that @classmethod/@staticmethod wrappers are applied last. */
+    for (i = 0; i < asdl_seq_LEN(decos); i++) {
+        ADDOP_I(c, CALL_FUNCTION, 1);
     }
 
     return compiler_nameop(c, s->v.FunctionDef.name, Store);

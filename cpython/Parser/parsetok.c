@@ -9,7 +9,6 @@
 #include "parsetok.h"
 #include "errcode.h"
 #include "graminit.h"
-#include "PythonX.h"
 
 int Py_TabcheckFlag;
 
@@ -43,36 +42,17 @@ PyParser_ParseStringFlagsFilename(const char *s, const char *filename,
                                                err_ret, &iflags);
 }
 
-static PyParser_CustomHandler_Type customParseStringHandler = NULL;
-static PyParser_CustomHandler_Free_Type customParseStringHandler_Free = NULL;
-
-void PyParser_SetCustomHandler(PyParser_CustomHandler_Type handler,
-    PyParser_CustomHandler_Free_Type free_handler)
-{
-    customParseStringHandler = handler;
-    customParseStringHandler_Free = free_handler;
-}
-
 node *
 PyParser_ParseStringFlagsFilenameEx(const char *s, const char *filename,
                           grammar *g, int start,
                           perrdetail *err_ret, int *flags)
 {
-    if(customParseStringHandler) {
-        const char* result = customParseStringHandler(s);
-        if(result) {
-            s = result;
-        }
-    }
     struct tok_state *tok;
 
     initerr(err_ret, filename);
 
     if ((tok = PyTokenizer_FromString(s, start == file_input)) == NULL) {
         err_ret->error = PyErr_Occurred() ? E_DECODE : E_NOMEM;
-        if(customParseStringHandler_Free && s) {
-            customParseStringHandler_Free(s);
-        }
         return NULL;
     }
 
@@ -81,9 +61,6 @@ PyParser_ParseStringFlagsFilenameEx(const char *s, const char *filename,
         tok->altwarning = (tok->filename != NULL);
         if (Py_TabcheckFlag >= 2)
             tok->alterror++;
-    }
-    if(customParseStringHandler_Free && s) {
-        customParseStringHandler_Free(s);
     }
     return parsetok(tok, g, start, err_ret, flags);
 }

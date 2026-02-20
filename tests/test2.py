@@ -1,7 +1,22 @@
 # -*- coding: utf-8 -*-
 
 class FuckEvent:
-    pass
+    _STATIC_VAR: int = 0
+
+    def testMethod(self, a: int) -> str:
+        pass
+
+    @classmethod
+    def testClassMethod(cls, a: int) -> str:
+        pass
+
+    @staticmethod
+    def testStaticMethod(a: int) -> str:
+        pass
+
+print FuckEvent.testMethod.__annotations__
+print FuckEvent.testStaticMethod.__annotations__
+print FuckEvent.testClassMethod.__annotations__
 
 def testFunc(event: FuckEvent, b: int) -> FuckEvent:
     pass

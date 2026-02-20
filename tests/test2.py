@@ -9,7 +9,7 @@ def testFunc(event: FuckEvent, b: int) -> FuckEvent:
 def testFunc2(event: FuckEvent | None) -> None:
     pass
 
-def testFunc3(a: 'int') -> int:
+def testFunc3(a: 'int', b: dict[str, int], c: list[tuple[float, float, float]]) -> int:
     pass
 
 aa = lambda x: x + 1

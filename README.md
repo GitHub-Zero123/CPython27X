@@ -6,7 +6,7 @@
 
 ## 简介
 
-CPython27X 在 Python 2.7 的基础上额外引入了 Python 3 的类型注解语法支持。类型注解在解析阶段被忽略，不影响运行时行为，适用于需要在 Python 2.7 环境中使用类型提示的场景（一些老式项目仍在使用 Python 2.7）。
+CPython27X 在 Python 2.7 的基础上额外引入了 Python 3 的类型注解语法支持。适用于需要在 Python 2.7 环境中使用类型提示的场景（一些老式项目仍在使用 Python 2.7）。
 
 ## 基础示例
 
@@ -97,6 +97,24 @@ dis.dis(testFunc2)
               7 RETURN_VALUE        
 ```
 其字节码完全相同，不会因为引入类型注解而产生兼容问题。
+
+## 运行时反射
+类型注解在运行时将会被解析生成到 `__annotations__` 属性中。可以通过反射访问这些注解信息：
+```python
+# -*- coding: utf-8 -*-
+class PlayerHurtEvent:
+    pass
+
+def testFunc(event: PlayerHurtEvent) -> None:
+    pass
+
+print testFunc.__annotations__
+```
+输出结果：
+
+```python
+{"event": <class "__main__.PlayerHurtEvent">, "return": None}
+```
 
 ## 核心变动
 

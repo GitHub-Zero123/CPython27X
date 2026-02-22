@@ -127,4 +127,6 @@ print testFunc.__annotations__
 - `graminit.c`
 - `compile.c`
 - `Python-ast.c`
+- `Python-ast.h`
+- `graminit.h`
 - `symtable.c`

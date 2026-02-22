@@ -14,6 +14,8 @@ changedFiles = [
     "Python/graminit.c",
     "Python/compile.c",
     "Python/Python-ast.c",
+    "Include/Python-ast.h",
+    "Include/graminit.h",
     "Python/symtable.c",
 ]
 
